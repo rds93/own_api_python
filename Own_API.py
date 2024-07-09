@@ -4,19 +4,11 @@ import json
 
 #This should be an ENV Variable
 OWN_ACCESS_TOKEN = 'tdD2UmwetfzcsLAZvokA2qzW_BzXJNVHmHVFE1Xk0y0'
-PLATFORM_TOKEN = '73g_-37mXVDtWacECH6xrYzRbH9x8Km_fowgCxHeT6o'
-
-DEV_URL = 'https://auth.owndata.dev/oauth2/aus87p3qk9A1RYtyi1d7/v1/token'
 AUTH_URL = 'https://auth.owndata.com/oauth2/aus4c3z3l8FqrbqDU4h7/v1/token'
-DEV_CLIENT_ID = '0oa8404h957tgdStn1d7'
-STG6_REQUESTS_URL = 'https://stg6.owndata.dev/'
-STG11_REQUESTS_URL = 'https://stg11.owndata.dev/'
+CLIENT_ID = '0oa4c413eq8wwcEzP4h7'
+payload = 'grant_type=' + 'refresh_token' + '&scope=' + 'api:access' + '&refresh_token=' + OWN_ACCESS_TOKEN + '&client_id=' + CLIENT_ID 
 
 DOMAIN = {'app1' : 'https://app1.ownbackup.com/api/v1/', 'useast2' : 'https://useast2.ownbackup.com/api/v1/'}
-client_id = '0oa4c413eq8wwcEzP4h7'
-
-payload = 'grant_type=' + 'refresh_token' + '&scope=' + 'api:access' + '&refresh_token=' + OWN_ACCESS_TOKEN + '&client_id=' + client_id 
-
 def own_login():
     #url = 'https://auth.ownbackup.com/oauth2/aus4c3z3l8FqrbqDU4h7/v1/token'
     
@@ -129,10 +121,10 @@ def paginate_audit_logs():
     res_csv = df.to_csv('audit_log.csv', index=False)
     return res_csv
     
-#go = paginate() 
+go = paginate_audit_logs() 
 #test = get_audit_logs()
 
-#print(go)
+print(go)
 
 #To grab the latest backup set 'latest_backup' = True
 def get_service_backups(service_id, backup_id = None, latest_backup = False):
@@ -231,7 +223,7 @@ def start_seed_job(template_id, destination_id,
     response_json = response.json()
     clean_response = json.dumps(response_json, indent = 2)
     #print(clean_response)
-    return response.text
+    return clean_response
     
 seed = start_seed_job(20552, get_services.get('destination_service_id'))
 
