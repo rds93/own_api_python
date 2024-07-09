@@ -3,7 +3,7 @@ import pandas as pd
 import json
 
 #This should be an ENV Variable
-OWN_ACCESS_TOKEN = 'tdD2UmwetfzcsLAZvokA2qzW_BzXJNVHmHVFE1Xk0y0'
+OWN_ACCESS_TOKEN = 'token'
 AUTH_URL = 'https://auth.owndata.com/oauth2/aus4c3z3l8FqrbqDU4h7/v1/token'
 CLIENT_ID = '0oa4c413eq8wwcEzP4h7'
 
