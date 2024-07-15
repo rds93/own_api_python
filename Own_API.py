@@ -1,25 +1,36 @@
 import requests
 import pandas as pd
 import json
+import os
+import dotenv
+import zipfile
 
-#This should be an ENV Variable
-OWN_ACCESS_TOKEN = 'token'
-AUTH_URL = 'https://auth.owndata.com/oauth2/aus4c3z3l8FqrbqDU4h7/v1/token'
-CLIENT_ID = '0oa4c413eq8wwcEzP4h7'
+#path to .env file must be specified if not in the same directory as the python script
+#pulls the environment variables from the .env file
+env_var = os.path.abspath('.env')
+dotenv.load_dotenv(env_var)
 
+OWN_ACCESS_TOKEN = os.getenv('OWN_ACCESS_TOKEN')
+AUTH_URL = os.getenv('AUTH_URL')
+CLIENT_ID = os.getenv('CLIENT_ID')
 DOMAIN = {'app1' : 'https://app1.ownbackup.com/api/v1/', 'useast2' : 'https://useast2.ownbackup.com/api/v1/'}
-payload = 'grant_type=' + 'refresh_token' + '&scope=' + 'api:access' + '&refresh_token=' + OWN_ACCESS_TOKEN + '&client_id=' + CLIENT_ID 
+
+#payload = 'grant_type=' + 'refresh_token' + '&scope=' + 'api:access' + '&refresh_token=' + OWN_ACCESS_TOKEN + '&client_id=' + CLIENT_ID 
+PAYLOAD = {'grant_type': 'refresh_token',
+           'scope' : 'api:access',
+           'refresh_token' : OWN_ACCESS_TOKEN,
+           'client_id' : CLIENT_ID}
 
 def own_login():
     headers = {'Content-Type': 'application/x-www-form-urlencoded',
                'Accept': 'application/json'}
 
-    response = requests.request("POST", AUTH_URL, headers=headers, data=payload)
+    response = requests.request("POST", AUTH_URL, headers=headers, data=PAYLOAD)
     res = response.json()
     
     access_token = res.get('access_token')
     print(f'Status Code: {response.status_code}')
-    #print(response.text)
+    
     return access_token
 
 get_access_token = own_login()
@@ -165,10 +176,145 @@ def get_audit_logs(event_id = None, get_all_logs = False):
         print('audit_log.csv is now ready')
         return res_csv
 
-print(get_audit_logs(get_all_logs = True))
+#print(get_audit_logs(get_all_logs = True))
     
+#The service Id is mandatory, To grab the latest backup set 'latest_backup' = True
+def get_service_backups(service_id, backup_id = None, latest_backup = False):
+    
+    if service_id == None:
+        raise Exception('No Service ID detected, please enter a service ID as an argument to retrieve its backups')
+    
+    #If no Backup_id is provided, a list of backups is provided
+    if backup_id == None and latest_backup == False:
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
+        
+        headers = {'Authorization': f'Bearer {get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        return clean_response
+    
+    elif backup_id == None and latest_backup == True:
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
+        
+        headers = {'Authorization': f'Bearer {get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        latest_backup_id = res[-1]['id']
+        return latest_backup_id
+    
+    #If a backup id is provided information for the specific backup is returned
+    else:
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}'
+    
+        headers = {'Authorization': f'Bearer {get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        
+        return clean_response
+    
+#get_service = get_service_backups(25598, 27155502)
+#print(get_service)
+
+# Service_id and Backup_id are required
+# name must be the object name in plural
+def list_backup_objects(service_id, backup_id, name = None, download_all = False,
+                        download_link = False, download_added_link = False, 
+                        download_changed_link = False, download_removed_link = False):
+    
+    if service_id == None or backup_id == None:
+        raise Exception('No Service ID/Backup ID detected, please enter a service ID and backup ID as arguments to get the backup info')
+    
+    url = DOMAIN.get('app1') + f'services/{service_id}/backups/{backup_id}/objects'
+    headers = {'Authorization': f'Bearer {get_access_token}'}
+    response = requests.request("GET", url, headers=headers)
+    res = response.json()
+    clean_response = json.dumps(res, indent=2)
+
+    obj_name = None
+    object_info = None
+    
+    try:
+        if name != None and download_all == True:
+            for i in res:
+                if name and name.lower() == i['name']:
+                    obj_name = i['name']
+                    object_info = i
+                    object_download = {
+        'download_link' : object_info['download_link'],
+        'download_added_link' : object_info['download_added_link'],
+        'download_changed_link' : object_info['download_changed_link'],
+        'download_removed_link' : object_info['download_removed_link']
+                    }
+                    print(object_download) 
+                
+            with zipfile.ZipFile("backup_download.zip", "w", compression=zipfile.ZIP_DEFLATED) as download_zip:
+                for key in object_download:
+                    print(key)
+                    print(object_download[key])
+                    get_download = requests.get(object_download[key],headers=headers, stream=True)
+                    print(f'Status Code: {get_download}')
+                    download_zip.writestr(f'{obj_name}_{key}.csv', get_download.content)
+                    print('Adding backup download to zip...')
+                    
+        elif name != None and download_link == True:
+            for i in res:
+                if name and name.lower() == i['name']:
+                    obj_name = i['name']
+                    object_info = i
+                    break
+                
+            get_link = requests.get(i['download_link'], headers=headers, stream=True)
+            with open(f'{name}.csv', 'wb') as dload:
+                dload.write(get_link.content)
+            print(f'{name} csv generated')
+            
+        elif name != None and download_added_link == True:
+            for i in res:
+                if name and name.lower() == i['name']:
+                    obj_name = i['name']
+                    object_info = i
+                    break
+                
+            get_link = requests.get(i['download_link'], headers=headers, stream=True)
+            with open(f'{name}_download_added_link.csv', 'wb') as dload:
+                dload.write(get_link.content)
+            print(f'{name}_download_added_link csv generated')
+            
+        elif name != None and download_changed_link == True:
+            for i in res:
+                if name and name.lower() == i['name']:
+                    obj_name = i['name']
+                    object_info = i
+                    break
+                
+            get_link = requests.get(i['download_link'], headers=headers, stream=True)
+            with open(f'{name}_download_changed_link.csv', 'wb') as dload:
+                dload.write(get_link.content)
+            print(f'{name}_download_changed_link csv generated')
+            
+        elif name != None and download_removed_link == True:
+            for i in res:
+                if name and name.lower() == i['name']:
+                    obj_name = i['name']
+                    object_info = i
+                    break
+                
+            get_link = requests.get(i['download_link'], headers=headers, stream=True)
+            with open(f'{name}_download_removed_link.csv', 'wb') as dload:
+                dload.write(get_link.content)
+            print(f'{name}_download_removed_link csv generated') 
+    except:
+        print(f'Something went wrong... verify the object name and make sure it is plural for example: "object_name__cs')
+                
+    return clean_response
+
+lbo = list_backup_objects(service_id = 96546,backup_id = 26895187, name = 'Accounts', download_added_link = True)
+
+
 #Optionally enter the exact source and destination service name to search for the Id
-def get_backup_services(source_service_name = None , destination_service_name = None):
+def get_service_ids_to_seed(source_service_name = None , destination_service_name = None):
     url = DOMAIN.get('app1') + 'services'
     
     if source_service_name == None and destination_service_name == None:
@@ -185,55 +331,17 @@ def get_backup_services(source_service_name = None , destination_service_name = 
                    'destination_service_id' : destination_service_id}
         
         for service in response.json():
-            if service["status"] != "ARCHIVED":
-                
-                if source_service_name in service["displayed_name"]:
-                    source_service_id = service["id"]
+            if source_service_name in service["displayed_name"]:
+                source_service_id = service["id"]
                     
-                if destination_service_name in service["displayed_name"]:
-                    destination_service_id = service["id"]
+            if destination_service_name in service["displayed_name"]:
+                destination_service_id = service["id"]
                 
         service_ids.update({'source_service_id' : source_service_id,
                             'destination_service_id' : destination_service_id})  
        
         return service_ids
 
-#The service Id is mandatory, To grab the latest backup set 'latest_backup' = True
-def get_service_backups(service_id, backup_id = None, latest_backup = False):
-    
-    if service_id == None:
-        raise Exception('No Service ID detected, please enter a service ID as an argument to retrieve its backups')
-    
-    #If no Backup_id is provided, a list of backups is provided
-    if backup_id == None and latest_backup == False:
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
-        
-        headers = {'Authorization': f'Bearer {get_access_token}'}
-        response = requests.request("GET", url, headers=headers, data=payload)
-        res = response.json()
-        clean_response = json.dumps(res, indent=2)
-        return clean_response
-    
-    elif backup_id == None and latest_backup == True:
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
-        
-        headers = {'Authorization': f'Bearer {get_access_token}'}
-        response = requests.request("GET", url, headers=headers, data=payload)
-        res = response.json()
-        latest_backup_id = res[-1]['id']
-        return latest_backup_id
-    
-    #If a backup id is provided information for the specific backup is returned
-    else:
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}'
-    
-        headers = {'Authorization': f'Bearer {get_access_token}'}
-        response = requests.request("GET", url, headers=headers, data=payload)
-        res = response.json()
-        clean_response = json.dumps(res, indent=2)
-        
-        return clean_response
-    
 
 # Template_id, destination_id, seeding_method, and disable_automations are required arguments
 def start_seed_job(template_id, destination_id,
