@@ -38,8 +38,12 @@ class own_api:
     def __init__(self):
         self.get_access_token = own_login()
 
-    #Auditing
     def get_audit_logs(self, event_id = None, get_all_logs = False):
+        '''Gets the audit logs
+        No arguments will get you a list of the very first 1000 events
+        event_id: gets a list of 1000 events starting from the event_Id provided
+        get_all_logs: set to true will get you all of the logs from beginning to end'''
+        
         last_event_list = []
         
         #Gets the first 1000 events
@@ -179,11 +183,13 @@ class own_api:
         
             print('audit_log.csv is now ready')
             return res_csv
-
-    #print(get_audit_logs(get_all_logs = True))
-        
-    #The service Id is mandatory, To grab the latest backup set 'latest_backup' = True
-    def get_service_backups(self, service_id, backup_id = None, latest_backup = False):
+    
+    def get_backups(self, service_id, backup_id = None, latest_backup = False):
+        '''Required arguments: service_id
+        backup_id: returns information for the specific backup
+        latest_backup: returns the lastest backup_id information
+        Gets a list of all available backups for a given service when no backup_id is provided
+        '''
         
         if service_id == None:
             raise Exception('No Service ID detected, please enter a service ID as an argument to retrieve its backups')
@@ -196,6 +202,7 @@ class own_api:
             response = requests.request("GET", url, headers=headers)
             res = response.json()
             clean_response = json.dumps(res, indent=2)
+            print(clean_response)
             return clean_response
         
         elif backup_id == None and latest_backup == True:
@@ -205,6 +212,7 @@ class own_api:
             response = requests.request("GET", url, headers=headers)
             res = response.json()
             latest_backup_id = res[-1]['id']
+            print(f'Latest backup id: {latest_backup_id}')
             return latest_backup_id
         
         #If a backup id is provided information for the specific backup is returned
@@ -215,19 +223,15 @@ class own_api:
             response = requests.request("GET", url, headers=headers)
             res = response.json()
             clean_response = json.dumps(res, indent=2)
-            
+            print(clean_response)
             return clean_response
-        
-    #get_service = get_service_backups(25598, 27155502)
-    #print(get_service)
-
-    # Service_id and Backup_id are required
-    # name must be the object name in plural
+ 
     def list_backup_objects(self, service_id, backup_id, name = None, download_all = False,
                             download_link = False, download_added_link = False, 
                             download_changed_link = False, download_removed_link = False):
-        ''' Required arguments: service_id, backup_id, name 
-        name: The object api name in plural form e.g. Accounts/Custom_Object__cs
+        ''' Required arguments: service_id, backup_id 
+        name: name is required if downloading an object's csv; 
+        name is the object api name in plural form e.g. Accounts/Custom_Object__cs
         download_all: will download all csvs for the given object
         download_link: downloads the csv of all records
         download_added_link: downloads only added records
@@ -324,8 +328,47 @@ class own_api:
                     
         return clean_response
 
+    def export_to_file(self, service_id = None, backup_id = None, export_format = 'csv', include_attachments = False, 
+                       sql_dialect = None, objects = None):
+        '''Required arguments: service_id, backup_id, 
+        export_format: Required export format. (This can only be one of csv,sql)
+        include_attachments: Should the export include attachments. e.g true, false
+        sql_dialect: SQL dialect to use when exporting to SQL. (This can only be one of mysql,oracle,postgresql,mssql)
+        objects: Name of object (in plural) to export. Can be multiple objects in a list []
+        Export a data backup into CSV or SQL by Service id and Backup id. Parameter backup_id can be 'last'
+        '''
+        
+        valid_sql_dialect = {None, 'mysql','oracle','postgresql','mssql'}
+        valid_export_format = {'csv', 'sql'}
+        if service_id == None or backup_id == None:
+            raise Exception('No Service ID/Backup ID detected, please enter a service ID and backup ID as arguments to get the backup info')     
+        if sql_dialect not in valid_sql_dialect:
+            raise ValueError("results: sql_dialect must be one of %r." % valid_sql_dialect)
+        if export_format not in valid_export_format:
+            raise ValueError("results: export_format must be one of %r." % valid_sql_dialect)
+        
+        
+        payload = {
+            'export_format' : export_format,
+            'include_attachments' : include_attachments,
+            'sql_dialect' : sql_dialect,
+            'objects' : objects
+        }
+        
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}/export'
+          
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers, data=payload)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+        
+
     def get_service_ids_to_seed(self, source_service_name = None , destination_service_name = None):
-        '''source_service_name and destination_service_name are optional arguments to get the service ids'''
+        '''source_service_name and destination_service_name are 
+        optional arguments to get the source and destination service ids
+        '''
         url = DOMAIN.get('app1') + 'services'
         if source_service_name == None and destination_service_name == None:
             
@@ -352,12 +395,14 @@ class own_api:
         
             return service_ids
 
-
-    # Template_id, destination_id, seeding_method, and disable_automations are required arguments
     def start_seed_job(self, template_id, destination_id,
                     seeding_method = 'incremental', disable_automations = False,
                     reindex = None, disable_validation_rules = None, backup_id = None, service_id = None):
-        '''template_id, destination_id, and disable_automations are required arguments'''
+        '''Required Arguments: template_id, destination_id, and disable_automations 
+        seeding_method: Allowed argument values -> incremental, upsert, or clean_and_insert 
+        backup_id: The backup id you would like to seed from
+        service_id: The Backup service you would like to seed from
+        '''
         
         if template_id == None or destination_id == None or seeding_method == None or disable_automations == None:
             raise Exception(f'Required arguments missing: template_id, destination_id, seeding_method, disable_automations')
@@ -383,6 +428,3 @@ class own_api:
         #print(clean_response)
         return response.text
         
-    #seed = start_seed_job(20552, get_service_ids_to_seed.get('destination_service_id'))
-
-    #print(seed)
