@@ -184,18 +184,22 @@ class own_api:
             print('audit_log.csv is now ready')
             return res_csv
     
-    def get_backups(self, service_id, backup_id = None, latest_backup = False):
-        '''Required arguments: service_id
-        backup_id: returns information for the specific backup
-        latest_backup: returns the lastest backup_id information
-        Gets a list of all available backups for a given service when no backup_id is provided
+    def get_backups(self, service_id, backup_id = None):
+        '''Get a list of all available backups for a given service or,
+        get a specific backup by the Service id and Backup id. 
+        Parameter backup_id can be 'last' and will return the last completed backup (with or without errors).\n
+        Parameters:
+            Required: service_id, 
+            backup_id: returns information for the specific backup (backup_id = 'last' returns the latest backup)
+        Returns:
+            JSON response with a list of all backups, or specific backup
         '''
         
         if service_id == None:
-            raise Exception('No Service ID detected, please enter a service ID as an argument to retrieve its backups')
+            raise Exception('No Service ID detected, please enter a service_id to retrieve its backups')
         
-        #If no Backup_id is provided, a list of backups is provided
-        if backup_id == None and latest_backup == False:
+        #If no Backup_id is provided, a list of all backups is provided
+        if backup_id == None:
             url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
             
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
@@ -205,17 +209,8 @@ class own_api:
             print(clean_response)
             return clean_response
         
-        elif backup_id == None and latest_backup == True:
-            url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
-            
-            headers = {'Authorization': f'Bearer {self.get_access_token}'}
-            response = requests.request("GET", url, headers=headers)
-            res = response.json()
-            latest_backup_id = res[-1]['id']
-            print(f'Latest backup id: {latest_backup_id}')
-            return latest_backup_id
-        
-        #If a backup id is provided information for the specific backup is returned
+        #If a backup_id is provided information for the specific backup is returned
+        #The backup_id can be set to 'last' to get the last backup
         else:
             url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}'
         
@@ -328,25 +323,28 @@ class own_api:
                     
         return clean_response
 
-    def export_to_file(self, service_id = None, backup_id = None, export_format = 'csv', include_attachments = False, 
+    def export_to_file(self, service_id = None, backup_id = None, export_format = 'csv', include_attachments = 'false', 
                        sql_dialect = None, objects = None):
-        '''Required arguments: service_id, backup_id, 
-        export_format: Required export format. (This can only be one of csv,sql)
-        include_attachments: Should the export include attachments. e.g true, false
-        sql_dialect: SQL dialect to use when exporting to SQL. (This can only be one of mysql,oracle,postgresql,mssql)
-        objects: Name of object (in plural) to export. Can be multiple objects in a list []
-        Export a data backup into CSV or SQL by Service id and Backup id. Parameter backup_id can be 'last'
+        '''Export a data backup into CSV or SQL by Service id and Backup id. Parameter backup_id can be 'last'\n
+        Parameters:
+            Required: service_id, backup_id
+            export_format: Required export format. (This can only be one of csv,sql)
+            include_attachments: Should the export include attachments. e.g true, false
+            sql_dialect: SQL dialect to use when exporting to SQL. 
+                (This can only be one of mysql,oracle,postgresql,mssql)
+            objects: Name of object (in plural) to export. Can be multiple objects in a list []
+        Returns:
+            JSON response with the job_id of the job that was created
         '''
         
         valid_sql_dialect = {None, 'mysql','oracle','postgresql','mssql'}
         valid_export_format = {'csv', 'sql'}
         if service_id == None or backup_id == None:
-            raise Exception('No Service ID/Backup ID detected, please enter a service ID and backup ID as arguments to get the backup info')     
+            raise Exception('No Service_id/Backup ID detected, please enter a service_id and backup_id')
         if sql_dialect not in valid_sql_dialect:
-            raise ValueError("results: sql_dialect must be one of %r." % valid_sql_dialect)
+            raise ValueError(f'results: sql_dialect must be one of {valid_sql_dialect}.')
         if export_format not in valid_export_format:
-            raise ValueError("results: export_format must be one of %r." % valid_sql_dialect)
-        
+            raise ValueError(f'results: export_format must be one of {valid_export_format}.' )
         
         payload = {
             'export_format' : export_format,
@@ -358,57 +356,203 @@ class own_api:
         url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}/export'
           
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
-        response = requests.request("GET", url, headers=headers, data=payload)
+        response = requests.request("POST", url, headers=headers, data=payload)
         res = response.json()
         clean_response = json.dumps(res, indent=2)
         print(clean_response)
         return clean_response
         
-
-    def get_service_ids_to_seed(self, source_service_name = None , destination_service_name = None):
-        '''source_service_name and destination_service_name are 
-        optional arguments to get the source and destination service ids
+    def export_to_endpoint(self, service_id = None, backup_id = None, endpoint_id = None, objects = []):
+        '''Export a data backup to Endpoint by Service id and Backup id. Parameter backup_id can be 'last'\n
+        Parameters:
+            Required: service_id, backup_id, endpoint_id
+            endpoint_id: Required endpoint ID. The UUID can be obtained from the Own Account Settings page on the Endpoints tab.
+                To get the unique identifier, click Edit beside the endpoint type.
+            objects:["<string>","<string>"] Object names to export, if empty all objects 
+        Returns:
+            JSON response with the job_id of the job that was created
         '''
-        url = DOMAIN.get('app1') + 'services'
-        if source_service_name == None and destination_service_name == None:
-            
-            headers = {'Authorization': f'Bearer {self.get_access_token}'}
-            response = requests.request("GET", url, headers=headers)
-            response_json = response.json()
-            clean_response = json.dumps(response_json, indent = 2)
-            
+        if service_id == None or backup_id == None or endpoint_id == None:
+            raise Exception('No service_id, backup_id or endpoint_id detected, please enter the service_id, backup_id, and endpoint_id to export to an endpoint')
+        
+        payload = {
+            'endpoint_id' : endpoint_id,
+            'objects' : objects
+        }
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}/export_to_endpoint'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("POST", url, headers=headers, data=payload)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+
+    def gdpr_rectify(self, service_id = None, record_id = None, table_name = None,
+                     field = None, value = None, comment = None):
+        '''Submitting a GDPR rectify request\n
+        Parameters:
+            Required: service_id, record_id, table_name, field, value
+            record_id: Required the id of the relevant record
+            table_name: Name of the object/table
+            field: the field to rectify
+            value: the new value
+            comment: comments
+            bulk: Set to True to send multiple requests up to rectify multiple records   
+        Returns:
+            JSON response with the job_id of the gdpr request
+        '''
+        if service_id == None or record_id == None or table_name == None or field == None or value == None :
+            raise Exception('service_id, record_id, table_name, field, value are required')
+        
+        payload = {
+            'record_id' : record_id,
+            'table_name' : table_name,
+            'field' : field,
+            'value' : value,
+            'comment' : comment
+        }
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/gdpr/rectify'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("POST", url, headers=headers, data=payload)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+
+    def gdpr_forget(self, service_id = None, record_id = None, table_name = None, 
+                    comment = None):
+        '''Submitting a GDPR forget request\n
+        Parameters:
+            Required: service_id, record_id, table_name, field, value
+            record_id: Required the id of the relevant record
+            table_name: Name of the object/table
+            comment: comments
+            bulk: Set to True to send multiple requests up to rectify multiple records   
+        Returns:
+            JSON response with the job_id of the gdpr request
+        '''
+        if service_id == None or record_id == None or table_name == None :
+            raise Exception('service_id, record_id, table_name are required')
+        
+        payload = {
+            'record_id' : record_id,
+            'table_name' : table_name,
+            'comment' : comment
+        }
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/gdpr/forget'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("POST", url, headers=headers, data=payload)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+
+    def get_jobs(self):
+        '''Get a list of all jobs'''
+        
+        url = f'https://app1.ownbackup.com/api/v1/jobs'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+
+    def get_specific_job(self, job_id):
+        '''Get specific job
+        Parameters:
+            Required: job_id
+        '''
+        
+        if job_id == None:
+            raise Exception('job_id is required')
+        
+        url = f'https://app1.ownbackup.com/api/v1/jobs'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response    
+
+    def get_seeding_templates(self, template_name = None):
+        '''Get all seeding templates that the user has access to.\n
+        Parameters: 
+            template_name: Allows you to search for a template by name and return its information
+        Returns:
+            JSON response of all templates, or a specified template
+        '''
+        
+        url = f'https://app1.ownbackup.com/api/v1/seeding/templates'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        
+        if template_name != None:
+            for name in res:
+                if template_name in name['name']:
+                    clean_response = json.dumps(name, indent=2)
+                    print(clean_response)
+                    return clean_response
+        else:
+            clean_response = json.dumps(res, indent=2)
+            print(clean_response)
             return clean_response
         
-        else: 
-            service_ids = {'source_service_id' : source_service_id, 
-                    'destination_service_id' : destination_service_id}
-            
-            for service in response.json():
-                if source_service_name in service["displayed_name"]:
-                    source_service_id = service["id"]
-                        
-                if destination_service_name in service["displayed_name"]:
-                    destination_service_id = service["id"]
-                    
-            service_ids.update({'source_service_id' : source_service_id,
-                                'destination_service_id' : destination_service_id})  
-        
-            return service_ids
-
+    def get_service_ids_to_seed(self, *service_name):
+        '''Get all services that can be used as destination for seeds.\n
+        Parameters:
+            *service_name: The name of a service 
+                (multiple service names separated by commas can be provided to search for multiple ids)  
+        Returns:
+            JSON Response containing a list of all services.\n
+            If a service_name is provided, a dictionary is returned containing each service name provided and its id. 
+        '''
+        url = DOMAIN.get('app1') + 'services'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        service_ids = {}
+        invalid_services = set()
+        if service_name != None:
+            for sn in service_name:
+                print(f'service name: {sn}')
+                for name in res:
+                    if sn in name['displayed_name']:
+                        print(json.dumps(name, indent=2))
+                        service_ids[name['displayed_name']] = name['id']
+                        break
+                if sn not in name['displayed_name']:
+                    print(f'{sn} not found')
+                    invalid_services.add(sn)
+                    continue  
+            print(service_ids) 
+            print(f'{invalid_services} - backup services not found' ) 
+            return service_ids     
+        else:
+            clean_response = json.dumps(res, indent=2)
+            print(clean_response)
+            return clean_response
+    
     def start_seed_job(self, template_id, destination_id,
                     seeding_method = 'incremental', disable_automations = False,
                     reindex = None, disable_validation_rules = None, backup_id = None, service_id = None):
-        '''Required Arguments: template_id, destination_id, and disable_automations 
-        seeding_method: Allowed argument values -> incremental, upsert, or clean_and_insert 
-        backup_id: The backup id you would like to seed from
-        service_id: The Backup service you would like to seed from
+        '''Start a new seed from the template's source service to the specified destination service.\n
+        Parameters:
+            Required: template_id, destination_id, disable_automations 
+            seeding_method: Allowed argument values (incremental, upsert, or clean_and_insert)
+            backup_id: The backup id you would like to seed from
+            service_id: The backup service you would like to seed from
+        Returns:
+            JSON response containing information on the seed job that was created
         '''
-        
+        valid_seeding_methods = {None, 'incremental', 'upsert', 'clean_and_insert'}
         if template_id == None or destination_id == None or seeding_method == None or disable_automations == None:
             raise Exception(f'Required arguments missing: template_id, destination_id, seeding_method, disable_automations')
+        if seeding_method not in valid_seeding_methods:
+            raise ValueError(f"results: seeding_method must be one of {valid_seeding_methods}.")
         
         url = DOMAIN.get('app1') + f'seeding/templates/{template_id}/seed'
-        
         payload = {
             'destination' : destination_id,
             'seeding_method' : seeding_method,
@@ -419,12 +563,26 @@ class own_api:
             'service_id' : service_id
         } 
         
-        files=[]    
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
-
-        response = requests.request("POST", url, headers=headers, data=payload, files=files)
+        response = requests.request("POST", url, headers=headers, data=payload)
         response_json = response.json()
         clean_response = json.dumps(response_json, indent = 2)
-        #print(clean_response)
-        return response.text
+        print(clean_response)
+        return clean_response
         
+    def get_seed_logs(self, seed_id):
+        '''Get information for the specified seed.\n
+        Parameters: 
+            Required: seed_id 
+            seed_id: id of the seed to retrieve logs from.
+        Returns:
+            JSON response of the seed logs
+        '''
+        
+        url = f'https://app1.ownbackup.com/api/v1/seeding/seed/{seed_id}'
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent = 2)
+        print(clean_response)
+        return clean_response
