@@ -13,10 +13,9 @@ dotenv.load_dotenv(env_var)
 OWN_ACCESS_TOKEN = os.getenv('OWN_ACCESS_TOKEN')
 AUTH_URL = os.getenv('AUTH_URL')
 CLIENT_ID = os.getenv('CLIENT_ID')
+
 #worth using if there are multiple regions on an Own Account
 DOMAIN = {'app1' : 'https://app1.ownbackup.com/api/v1/', 'useast2' : 'https://useast2.ownbackup.com/api/v1/'}
-
-#payload = 'grant_type=' + 'refresh_token' + '&scope=' + 'api:access' + '&refresh_token=' + OWN_ACCESS_TOKEN + '&client_id=' + CLIENT_ID 
 PAYLOAD = {'grant_type': 'refresh_token',
            'scope' : 'api:access',
            'refresh_token' : OWN_ACCESS_TOKEN,
