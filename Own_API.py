@@ -499,7 +499,7 @@ class own_api:
             print(clean_response)
             return clean_response
         
-    def get_service_ids_to_seed(self, *service_name):
+    def get_service_ids(self, *service_name):
         '''Get all services that can be used as destination for seeds.\n
         Parameters:
             *service_name: The name of a service 
@@ -514,7 +514,7 @@ class own_api:
         res = response.json()
         service_ids = {}
         invalid_services = set()
-        if service_name != None:
+        if len(service_name) != 0:
             for sn in service_name:
                 print(f'service name: {sn}')
                 for name in res:
@@ -534,6 +534,22 @@ class own_api:
             print(clean_response)
             return clean_response
     
+    def get_specific_service_id(self, service_id):
+        '''Get a specific service by Service id.\n
+        Parameters:
+            *service_id: The service id
+        Returns:
+            JSON Response of specific service information.\n
+        '''
+        url = DOMAIN.get('app1') + f'services/{service_id}'
+        
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()
+        clean_response = json.dumps(res, indent=2)
+        print(clean_response)
+        return clean_response
+        
     def start_seed_job(self, template_id, destination_id,
                     seeding_method = 'incremental', disable_automations = False,
                     reindex = None, disable_validation_rules = None, backup_id = None, service_id = None):
@@ -585,4 +601,57 @@ class own_api:
         res = response.json()
         clean_response = json.dumps(res, indent = 2)
         print(clean_response)
+        return clean_response
+    
+    def start_anonymize_job(self, template_id, destination_service_id,
+                    disable_automations = False, backup_id = None,
+                    automations_to_disable = {}):
+        '''Run anonymization template on a specific sandbox.
+        Parameters:
+            Required: template_id, destination_service_id, disable_automations
+            template_id: template used to anonymize the data
+            destination_service_id: service id to be anonymized - type: integer
+            disable_automations: disables automations in the environment - values are True or False - type: string
+            automations_to_disable: (optional) Can select which automations to disable e.g. "ApexTrigger": ["AccountApexTrigger", "TaskApexTrigger"] - type: dictionary
+            backup_id: (optional) used when fetching from backup - type: string
+        Returns:
+            JSON response containing information the job id of the anonymize job created
+        '''
+        
+        url = DOMAIN.get('app1') + f'seeding/templates/{template_id}/anonymize'
+        payload = {
+            'destination_service_id' : destination_service_id,
+            'backup_id' : backup_id,
+            'disable_automations' : disable_automations,
+            'automations_to_disable' : automations_to_disable
+        } 
+        print(payload)
+        
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("POST", url, headers=headers, data=payload)
+        res = response.json()
+        job_id = res['job_id']
+        
+        clean_response = json.dumps(res, indent = 2)
+        print(clean_response)
+        print(f'job id: {job_id}')
+        return job_id
+    
+    def get_anonymize_logs(self, anonymize_job_id):
+        '''Get information for the specified anonymization job.
+        Parameters:
+            Required: anonymize_id
+            anonymize_id: the job id of the anonymize job
+        Returns:
+            JSON response containing information on the anonymize job that was created
+        '''
+        
+        url = DOMAIN.get('app1') + f'seeding/anonymize/{anonymize_job_id}'
+        
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("GET", url, headers=headers)
+        res = response.json()        
+        clean_response = json.dumps(res, indent = 2)
+        print(clean_response)
+        
         return clean_response
