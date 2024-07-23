@@ -220,6 +220,23 @@ class own_api:
             print(clean_response)
             return clean_response
  
+    def start_manual_backup(self, service_id):
+        '''Start backup a service manually now by Service id.\n
+        Parameters:
+            Required: service_id,
+        Returns:
+            Response status
+        '''
+        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backup_now'
+            
+        headers = {'Authorization': f'Bearer {self.get_access_token}'}
+        response = requests.request("POST", url, headers=headers)
+        res = response.json()
+        
+        if response.status_code == 200:
+            print('Backup initializing')
+        return res
+    
     def list_backup_objects(self, service_id, backup_id, name = None, download_all = False,
                             download_link = False, download_added_link = False, 
                             download_changed_link = False, download_removed_link = False):
