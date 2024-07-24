@@ -11,15 +11,29 @@ env_var = os.path.abspath('.env')
 dotenv.load_dotenv(env_var)
 
 OWN_ACCESS_TOKEN = os.getenv('OWN_ACCESS_TOKEN')
-AUTH_URL = os.getenv('AUTH_URL')
-CLIENT_ID = os.getenv('CLIENT_ID')
-
-#worth using if there are multiple regions on an Own Account
-DOMAIN = {'app1' : 'https://app1.ownbackup.com/api/v1/', 'useast2' : 'https://useast2.ownbackup.com/api/v1/'}
-PAYLOAD = {'grant_type': 'refresh_token',
-           'scope' : 'api:access',
-           'refresh_token' : OWN_ACCESS_TOKEN,
-           'client_id' : CLIENT_ID}
+AUTH_URL = 'https://auth.owndata.com/oauth2/aus4c3z3l8FqrbqDU4h7/v1/token'
+CLIENT_ID = '0oa4c413eq8wwcEzP4h7'
+DOMAIN = {
+    'app1' : 'https://app1.owndata.com/api/v1/',
+    'useast2' : 'https://useast2.owndata.com/api/v1/',
+    'hipaa1' : 'https://hipaa1.owndata.com/api/v1/',
+    'hipaa4' : 'https://hipaa4.owndata.com/api/v1/',
+    'usgov2' : 'https://usgov2.owndata.com/api/v1/',
+    'ca1' : 'https://ca1.owndata.com/api/v1/',
+    'ca4' : 'https://ca4.owndata.com/api/v1/',
+    'emea1' : 'https://emea1.owndata.com/api/v1/',
+    'emea2' : 'https://emea1.owndata.com/api/v1/',
+    'emea4' : 'https://emea4.owndata.com/api/v1/',
+    'uk1' : 'https://uk1.owndata.com/api/v1/',
+    'au1' : 'https://au1.owndata.com/api/v1/',
+    'au4' : 'https://au4.owndata.com/api/v1/'
+    }
+PAYLOAD = {
+    'grant_type': 'refresh_token',
+    'scope' : 'api:access',
+    'refresh_token' : OWN_ACCESS_TOKEN,
+    'client_id' : CLIENT_ID
+    }
 
 def own_login():
     headers = {'Content-Type': 'application/x-www-form-urlencoded',
@@ -38,20 +52,32 @@ class own_api:
         self.get_access_token = own_login()
 
     def get_audit_logs(self, event_id = None, get_all_logs = False):
-        '''Gets the audit logs
-        No arguments will get you a list of the very first 1000 events
-        event_id: gets a list of 1000 events starting from the event_Id provided
-        get_all_logs: set to true will get you all of the logs from beginning to end'''
+        '''Get the account event history from the beginning of time (default route)
+        or all events that follow a specific event (use parameter with the id of an event),
+        results are limited to 1,000 events per request.
+        
+        Parameters:
+            event_id: gets events from the event id provided - type: integer
+            get_all_logs: if set to True, all logs will be retrieved - type: boolean (True, False)
+        Returns:
+            When event_id is not provided, and get_all_logs = False
+                CSV and JSON response containing up to the first 1000 events
+            When event_id is provided and get_all_logs = False
+                CSV and JSON response containing up to 1000 events from the event id
+            When event_id is not provided and get_all_logs = True
+                CSV and JSON response containing all events from the beginning of time
+            When event_id is provided and get_all_logs = True
+                CSV and JSON response containing all events after the event id provided
+        '''
         
         last_event_list = []
         
         #Gets the first 1000 events
         if event_id == None and get_all_logs == False:
-            url = f"https://app1.ownbackup.com/api/v1/events"
+            url = DOMAIN.get('app1') + 'events'
             
-            payload={}
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
-            response = requests.request("GET", url, headers=headers, data=payload)
+            response = requests.request("GET", url, headers=headers)
 
             res = response.json()
             clean_response = json.dumps(res, indent = 2)
@@ -68,16 +94,15 @@ class own_api:
         #Gets a list of 1000 events starting from the event_Id provided
         elif event_id != None and get_all_logs == False:
             
-            url = f"https://app1.ownbackup.com/api/v1/events?from={event_id}"
+            url = DOMAIN.get('app1') + f'events?from={event_id}'
             
-            payload={}
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
-            response = requests.request("GET", url, headers=headers, data=payload)
+            response = requests.request("GET", url, headers=headers)
             
             res = response.json()
             clean_response = json.dumps(res, indent = 2)
             
-            print(f'These are the 1000 Logs following event id: {event_id}')
+            print(f'These are the 1000 events following event id: {event_id}')
             df = pd.DataFrame(res)
             res_csv = df.to_csv('audit_log.csv', index=False)
 
@@ -88,11 +113,10 @@ class own_api:
         #Gets all logs from the beginning to end
         elif event_id == None and get_all_logs == True:
             
-            url = f"https://app1.ownbackup.com/api/v1/events"
+            url = DOMAIN.get('app1') + 'events'
             payload={}
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
             response = requests.request("GET", url, headers=headers, data=payload)
-    
             res = response.json()
             row_count = len(res)
             
@@ -107,10 +131,10 @@ class own_api:
                 page+=1
                 
                 if row_count == 1000:
-                    url = f"https://app1.ownbackup.com/api/v1/events?from={last_event}"
-                    payload={}
+                    url = DOMAIN.get('app1') + f'events?from={last_event}'
+                    
                     headers = {'Authorization': f'Bearer {self.get_access_token}'}
-                    response = requests.request("GET", url, headers=headers, data=payload)
+                    response = requests.request("GET", url, headers=headers)
                     
                     res = response.json()
                     row_count = len(res)
@@ -136,28 +160,26 @@ class own_api:
 
         #Gets all events following the event_id provided
         else: 
-            url = f"https://app1.ownbackup.com/api/v1/events?from={event_id}"
+            url = DOMAIN.get('app1') + f'events?from={event_id}'
             
-            payload={}
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
-            response = requests.request("GET", url, headers=headers, data=payload)
-            
+            response = requests.request("GET", url, headers=headers)
             res = response.json()
             row_count = len(res)
 
         #Gets the last event in the Response
-            
             last_event = res[-1]['event_id']
             print(f'This is the last event: {last_event}')
-            
             last_event_list.append(last_event)
             
+            page = 0
+            final_res = res
         #Adds the last event to the list to be used if iterating
             for i in last_event_list:
                 page+=1
                 
                 if row_count == 1000:
-                    url = f"https://app1.ownbackup.com/api/v1/events?from={last_event}"
+                    url = DOMAIN.get('app1') + f'events?from={last_event}'
                     payload={}
                     headers = {'Authorization': f'Bearer {self.get_access_token}'}
                     response = requests.request("GET", url, headers=headers, data=payload)
@@ -174,7 +196,7 @@ class own_api:
                     continue
             
                 elif row_count < 1000:
-                    print(f'This is the count of logs on the last page: {row_count}\n This is the last event Id: {last_event}')
+                    print(f'This is the count of logs on the last page: {row_count}\nThis is the last event Id: {last_event}')
                     break
                 
             df = pd.DataFrame(final_res)
@@ -188,7 +210,7 @@ class own_api:
         get a specific backup by the Service id and Backup id. 
         Parameter backup_id can be 'last' and will return the last completed backup (with or without errors).\n
         Parameters:
-            Required: service_id, 
+            Required: service_id
             backup_id: returns information for the specific backup (backup_id = 'last' returns the latest backup)
         Returns:
             JSON response with a list of all backups, or specific backup
@@ -199,7 +221,7 @@ class own_api:
         
         #If no Backup_id is provided, a list of all backups is provided
         if backup_id == None:
-            url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups'
+            url = DOMAIN.get('app1') + f'services/{service_id}/backups'
             
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
             response = requests.request("GET", url, headers=headers)
@@ -211,7 +233,7 @@ class own_api:
         #If a backup_id is provided information for the specific backup is returned
         #The backup_id can be set to 'last' to get the last backup
         else:
-            url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}'
+            url = DOMAIN.get('app1') + f'services/{service_id}/backups/{backup_id}'
         
             headers = {'Authorization': f'Bearer {self.get_access_token}'}
             response = requests.request("GET", url, headers=headers)
@@ -223,33 +245,41 @@ class own_api:
     def start_manual_backup(self, service_id):
         '''Start backup a service manually now by Service id.\n
         Parameters:
-            Required: service_id,
+            Required: service_id
         Returns:
-            Response status
+            status code
         '''
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backup_now'
+        url = DOMAIN.get('app1') + f'services/{service_id}/backup_now'
             
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("POST", url, headers=headers)
         res = response.json()
         
         if response.status_code == 200:
-            print('Backup initializing')
+            print('Manual backup initializing')
+        else:
+            print(f'Something went wrong - Status code: {response.status_code}')
         return res
     
     def list_backup_objects(self, service_id, backup_id, name = None, download_all = False,
                             download_link = False, download_added_link = False, 
                             download_changed_link = False, download_removed_link = False):
-        ''' Required arguments: service_id, backup_id 
-        name: name is required if downloading an object's csv; 
-        name is the object api name in plural form e.g. Accounts/Custom_Object__cs
-        download_all: will download all csvs for the given object
-        download_link: downloads the csv of all records
-        download_added_link: downloads only added records
-        download_changed_link: downloads only changed records
-        download_removed_link: downloads only deleted records
-        list_backup_objects: gets object information from the backups and,
-        provides the links to download the object from the backup.
+        '''Get list of objects in a backup by Service id and Backup id. Parameter backup_id can be 'last'.
+        The following fields: download_link, download_added_link, download_removed_link and download_changed_link 
+        contain links to the associated data of that backup, stored in CSV format.
+        To download these CSVs, issue an HTTPS GET request (using a valid session) to these URLs.
+        (Only one download parameter can be set at a time to download the csv or zip)\n
+        Parameters:
+            Required: service_id, backup_id 
+            name: required if downloading an object's csv or zip; name is the object api name in plural form e.g. Accounts/Custom_Object__cs
+            download_all: will download all csvs for the given object as a zip file - type: boolean(True, False)
+            download_link: downloads the csv of all records - type: boolean(True, False)
+            download_added_link: downloads only added records - type: boolean(True, False)
+            download_changed_link: downloads only changed records - type: boolean(True, False)
+            download_removed_link: downloads only deleted records - type: boolean(True, False)
+        Returns:
+            JSON response containing a list of objects in a backup
+            CSV or ZIP file returned if any of the download parameters are set to true
         '''
         
         if service_id == None or backup_id == None:
@@ -369,7 +399,7 @@ class own_api:
             'objects' : objects
         }
         
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}/export'
+        url = DOMAIN.get('app1') + f'services/{service_id}/backups/{backup_id}/export'
           
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("POST", url, headers=headers, data=payload)
@@ -395,7 +425,7 @@ class own_api:
             'endpoint_id' : endpoint_id,
             'objects' : objects
         }
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/backups/{backup_id}/export_to_endpoint'
+        url = DOMAIN.get('app1') + f'services/{service_id}/backups/{backup_id}/export_to_endpoint'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("POST", url, headers=headers, data=payload)
         res = response.json()
@@ -427,7 +457,7 @@ class own_api:
             'value' : value,
             'comment' : comment
         }
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/gdpr/rectify'
+        url = DOMAIN.get('app1') + f'services/{service_id}/gdpr/rectify'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("POST", url, headers=headers, data=payload)
         res = response.json()
@@ -455,7 +485,7 @@ class own_api:
             'table_name' : table_name,
             'comment' : comment
         }
-        url = f'https://app1.ownbackup.com/api/v1/services/{service_id}/gdpr/forget'
+        url = DOMAIN.get('app1') + f'services/{service_id}/gdpr/forget'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("POST", url, headers=headers, data=payload)
         res = response.json()
@@ -466,7 +496,7 @@ class own_api:
     def get_jobs(self):
         '''Get a list of all jobs'''
         
-        url = f'https://app1.ownbackup.com/api/v1/jobs'
+        url = DOMAIN.get('app1') + 'jobs'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("GET", url, headers=headers)
         res = response.json()
@@ -483,7 +513,7 @@ class own_api:
         if job_id == None:
             raise Exception('job_id is required')
         
-        url = f'https://app1.ownbackup.com/api/v1/jobs'
+        url = DOMAIN.get('app1') + 'jobs'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("GET", url, headers=headers)
         res = response.json()
@@ -499,7 +529,7 @@ class own_api:
             JSON response of all templates, or a specified template
         '''
         
-        url = f'https://app1.ownbackup.com/api/v1/seeding/templates'
+        url = DOMAIN.get('app1') + 'seeding/templates'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("GET", url, headers=headers)
         res = response.json()
@@ -611,7 +641,7 @@ class own_api:
             JSON response of the seed logs
         '''
         
-        url = f'https://app1.ownbackup.com/api/v1/seeding/seed/{seed_id}'
+        url = DOMAIN.get('app1') + f'seeding/seed/{seed_id}'
         headers = {'Authorization': f'Bearer {self.get_access_token}'}
         response = requests.request("GET", url, headers=headers)
         res = response.json()
