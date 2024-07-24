@@ -22,7 +22,7 @@ DOMAIN = {
     'ca1' : 'https://ca1.owndata.com/api/v1/',
     'ca4' : 'https://ca4.owndata.com/api/v1/',
     'emea1' : 'https://emea1.owndata.com/api/v1/',
-    'emea2' : 'https://emea1.owndata.com/api/v1/',
+    'emea2' : 'https://emea2.owndata.com/api/v1/',
     'emea4' : 'https://emea4.owndata.com/api/v1/',
     'uk1' : 'https://uk1.owndata.com/api/v1/',
     'au1' : 'https://au1.owndata.com/api/v1/',
