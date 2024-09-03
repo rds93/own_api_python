@@ -336,7 +336,7 @@ class own_api:
                         object_info = i
                         break
                     
-                get_link = requests.get(i['download_link'], headers=headers, stream=True)
+                get_link = requests.get(i['download_added_link'], headers=headers, stream=True)
                 with open(f'{name}_download_added_link.csv', 'wb') as dload:
                     dload.write(get_link.content)
                 print(f'{name}_download_added_link csv generated')
@@ -348,7 +348,7 @@ class own_api:
                         object_info = i
                         break
                     
-                get_link = requests.get(i['download_link'], headers=headers, stream=True)
+                get_link = requests.get(i['download_changed_link'], headers=headers, stream=True)
                 with open(f'{name}_download_changed_link.csv', 'wb') as dload:
                     dload.write(get_link.content)
                 print(f'{name}_download_changed_link csv generated')
@@ -360,7 +360,7 @@ class own_api:
                         object_info = i
                         break
                     
-                get_link = requests.get(i['download_link'], headers=headers, stream=True)
+                get_link = requests.get(i['download_removed_link'], headers=headers, stream=True)
                 with open(f'{name}_download_removed_link.csv', 'wb') as dload:
                     dload.write(get_link.content)
                 print(f'{name}_download_removed_link csv generated') 
