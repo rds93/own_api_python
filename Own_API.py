@@ -442,8 +442,7 @@ class own_api:
             table_name: Name of the object/table
             field: the field to rectify
             value: the new value
-            comment: comments
-            bulk: Set to True to send multiple requests up to rectify multiple records   
+            comment: comments 
         Returns:
             JSON response with the job_id of the gdpr request
         '''
